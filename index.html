@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OPTIMISTIC BANKING SERVICES - Admin Panel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(to right, #74ebd5, #9face6);
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+    header {
+      background-color: #007bff;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    .container {
+      padding: 2rem;
+      background-color: rgba(255, 255, 255, 0.95);
+      max-width: 900px;
+      margin: 2rem auto;
+      border-radius: 10px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+    }
+    .hidden { display: none; }
+    form, table {
+      margin-bottom: 2rem;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: white;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
+    }
+    th, td {
+      padding: 0.5rem;
+      text-align: left;
+    }
+    input[type="text"], input[type="password"] {
+      padding: 0.5rem;
+      margin-right: 0.5rem;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 5px;
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>OPTIMISTIC BANKING SERVICES</h1>
+  </header>
+  <div class="container">
+    <div id="loginSection">
+      <h2>Admin Login</h2>
+      <input type="password" id="adminPassword" placeholder="Enter admin password" />
+      <button onclick="login()">Login</button>
+    </div>
+
+    <div id="appSection" class="hidden">
+      <h2>Customer Registration</h2>
+      <form id="customerForm">
+        <input type="text" id="customerName" placeholder="Customer Name" required />
+        <input type="text" id="customerId" placeholder="Customer ID" required />
+        <button type="submit">Register Customer</button>
+      </form>
+
+      <h2>Customers</h2>
+      <table id="customersTable">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>ID</th>
+            <th>Savings</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <h2 id="transactionsHeader" class="hidden">Transactions for <span id="selectedCustomer"></span></h2>
+      <table id="transactionsTable" class="hidden">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let adminPassword = "admin123";
+    let customers = JSON.parse(localStorage.getItem("customers") || "[]");
+    let transactions = JSON.parse(localStorage.getItem("transactions") || "{}");
+
+    function login() {
+      const password = document.getElementById("adminPassword").value;
+      if (password === adminPassword) {
+        document.getElementById("loginSection").classList.add("hidden");
+        document.getElementById("appSection").classList.remove("hidden");
+        renderCustomers();
+      } else {
+        alert("Incorrect password!");
+      }
+    }
+
+    document.getElementById("customerForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const name = document.getElementById("customerName").value;
+      const id = document.getElementById("customerId").value;
+      if (customers.some(c => c.id === id)) return alert("Customer ID already exists");
+      customers.push({ name, id, status: "Not Paid" });
+      transactions[id] = [];
+      saveData();
+      renderCustomers();
+      this.reset();
+    });
+
+    function renderCustomers() {
+      const tbody = document.querySelector("#customersTable tbody");
+      tbody.innerHTML = "";
+      customers.forEach(customer => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${customer.name}</td>
+          <td>${customer.id}</td>
+          <td>$${calculateSavings(customer.id)}</td>
+          <td>${customer.status}</td>
+          <td>
+            <button onclick="recordPayment('${customer.id}')">Record Payment</button>
+            <button onclick="viewTransactions('${customer.id}', '${customer.name}')">View</button>
+            <button onclick="togglePaid('${customer.id}')">Toggle Status</button>
+            <button onclick="deleteCustomer('${customer.id}')">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function calculateSavings(customerId) {
+      return transactions[customerId]?.reduce((sum, tx) => sum + tx.amount, 0) || 0;
+    }
+
+    function recordPayment(customerId) {
+      const amount = parseFloat(prompt("Enter payment amount:"));
+      if (isNaN(amount) || amount <= 0) return;
+      transactions[customerId].push({ date: new Date().toLocaleDateString(), amount });
+      saveData();
+      renderCustomers();
+    }
+
+    function viewTransactions(customerId, name) {
+      const table = document.getElementById("transactionsTable");
+      const header = document.getElementById("transactionsHeader");
+      const span = document.getElementById("selectedCustomer");
+      span.textContent = name + " (" + customerId + ")";
+      const tbody = table.querySelector("tbody");
+      tbody.innerHTML = "";
+      transactions[customerId].forEach(tx => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td>${tx.date}</td><td>$${tx.amount}</td>`;
+        tbody.appendChild(tr);
+      });
+      header.classList.remove("hidden");
+      table.classList.remove("hidden");
+    }
+
+    function togglePaid(customerId) {
+      const customer = customers.find(c => c.id === customerId);
+      customer.status = customer.status === "Paid" ? "Not Paid" : "Paid";
+      saveData();
+      renderCustomers();
+    }
+
+    function deleteCustomer(customerId) {
+      if (!confirm("Are you sure you want to delete this customer and all records?")) return;
+      customers = customers.filter(c => c.id !== customerId);
+      delete transactions[customerId];
+      saveData();
+      renderCustomers();
+    }
+
+    function saveData() {
+      localStorage.setItem("customers", JSON.stringify(customers));
+      localStorage.setItem("transactions", JSON.stringify(transactions));
+    }
+  </script>
+</body>
+</html>
